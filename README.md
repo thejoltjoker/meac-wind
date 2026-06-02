@@ -208,15 +208,23 @@ The test suite expects a Vitest setup and checks:
 
 ## Publishing
 
-Before publishing to npm:
+Releases are automated with GitHub Actions + release-please.
 
-1. Update the repository URLs in `package.json` to point to your actual repository
-2. Run `npm run build` to compile TypeScript
-3. Run `npm test` to ensure all tests pass
-4. Update version in `package.json` following [semver](https://semver.org/)
-5. Run `npm publish`
+### One-time setup
 
-Note: The `prepublishOnly` script automatically runs build and tests before publishing.
+1. Add an npm automation token as a GitHub Actions secret named `NPM_TOKEN`.
+2. Ensure your default branch is `main`.
+3. Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, etc.) for merge commits so release-please can infer version bumps.
+
+### Release flow
+
+1. Push/merge changes to `main`.
+2. `Release Please` opens or updates a release PR with version/changelog updates.
+3. Merge the release PR when ready.
+4. release-please creates a GitHub release and tag.
+5. `Publish to npm` workflow publishes the tagged release to npm automatically.
+
+The CI workflow (`CI`) runs build + tests on push and pull requests.
 
 ## License
 
