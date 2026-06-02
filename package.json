@@ -40,7 +40,7 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "prepublishOnly": "pnpm run build && pnpm test"
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "linkedom": "^0.18.12",
@@ -55,6 +55,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "packageManager": "pnpm@9.14.4"
+  }
 }
