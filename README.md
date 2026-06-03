@@ -99,14 +99,35 @@ The package includes TypeScript definitions. Import types as needed:
 ```ts
 import {
   fetchWindData,
+  isKnownSlug,
   KNOWN_SLUGS,
   WindDataFetchError,
   WindDataValidationError,
+  type FetchWindDataOptions,
   type WindData,
   type WindStatistics,
   type Slug,
 } from "meac-wind";
+
+if (isKnownSlug("hummeln")) {
+  // slug is typed as KnownSlug
+}
 ```
+
+### Request options
+
+```ts
+import { fetchWindData } from "meac-wind";
+
+// Timeout after 10 seconds (uses AbortSignal.timeout)
+const data = await fetchWindData("hummeln", { timeoutMs: 10_000 });
+
+// Or supply your own AbortSignal (timeoutMs is ignored when signal is set)
+const controller = new AbortController();
+const data2 = await fetchWindData("hummeln", { signal: controller.signal });
+```
+
+Slugs must match `[a-z][a-z0-9-]{0,63}` (lowercase letters, digits, hyphens). Invalid slugs throw `WindDataFetchError` before any network request.
 
 ## Returned data shape
 
@@ -123,7 +144,8 @@ type WindStatistics = {
 };
 
 type WindData = {
-  lastUpdate: string; // ISO-like timestamp: YYYY-MM-DDTHH:MM:SS
+  // ISO-like local timestamp from the page (no timezone offset applied)
+  lastUpdate: string; // YYYY-MM-DDTHH:MM:SS
   location: string;
   windStrength: number;
   temperature: number;
@@ -137,12 +159,12 @@ type WindData = {
 
 Validation is implemented in `src/schemas.ts`:
 
-- `lastUpdate` must match `YYYY-MM-DDTHH:MM:SS` (parser output format).
+- `lastUpdate` must match `YYYY-MM-DDTHH:MM:SS` (parser output format). This is the timestamp string shown on the MEAC page, not a timezone-aware instant; invalid calendar dates are not rejected.
 - `windStrength`, statistics values, and history `speed` are non-negative.
 - `windDirection` must be between `0` and `360`.
 - `history` is an array of `{ speed, timestamp }`.
 
-Statistics are read from `.meac_data_simple` elements in page order. If MEAC reorders labels or markup, `max` / `average` / `min` may be wrong until the parser is updated.
+Statistics are read by matching `.meac_label` text (`Max`, `Medel`, `Min`) to the wind speed in the same table row. Parsed values must satisfy `max >= average >= min`.
 
 ## Best practices for production use
 
@@ -192,7 +214,7 @@ try {
 
 ### 3. Identify your app
 
-The package sends a transparent user-agent (`meac-wind-scraper/...`). Forks and apps built on top should use their own identifier with a contact URL, for example:
+The package sends a transparent user-agent (`meac-wind/<version>`). Forks and apps built on top should use their own identifier with a contact URL, for example:
 
 ```typescript
 "user-agent": "my-wind-dashboard/1.0 (+https://github.com/you/my-app)"
@@ -248,10 +270,14 @@ npm run test:watch # Run tests in watch mode
 
 Current source files:
 
-- `src/index.ts` - fetch and parse logic (HTML scraping under the hood).
+- `src/index.ts` - public API, fetch, and Zod validation.
+- `src/parser.ts` - HTML document parsing (panels, statistics, history).
 - `src/schemas.ts` - Zod schemas and exported types.
-- `src/types.ts` - TypeScript type definitions.
+- `src/types.ts` - slug types and `isKnownSlug`.
+- `src/slug.ts` - slug format validation.
+- `src/options.ts` - `FetchWindDataOptions` and abort/timeout handling.
 - `src/index.test.ts` - Vitest tests with mocked fetch responses.
+- `src/index.live.test.ts` - optional live test (`MEAC_LIVE=1 npm test`; skipped by default).
 
 The test suite uses Vitest with mocked `fetch` responses and checks:
 
