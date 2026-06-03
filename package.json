@@ -2,6 +2,8 @@
   "name": "meac-wind",
   "version": "0.1.0",
   "description": "TypeScript client for fetching and parsing public MEAC wind page data",
+  "type": "module",
+  "sideEffects": false,
   "keywords": [
     "wind",
     "weather",
@@ -27,7 +29,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -49,11 +51,16 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
+    "@types/node": "^22.13.10",
     "@vitest/coverage-v8": "4.1.8",
     "typescript": "^5.7.3",
     "vitest": "^4.1.8"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
