@@ -1,6 +1,6 @@
 {
   "name": "meac-wind",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript client for fetching and parsing public MEAC wind page data",
   "type": "module",
   "sideEffects": false,
