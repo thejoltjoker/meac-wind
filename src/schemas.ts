@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-/** ISO-like timestamp produced by the parser: `YYYY-MM-DDTHH:MM:SS`. */
+/** `lastUpdate` validation pattern (`YYYY-MM-DDTHH:MM:SS`, local page time). */
 const lastUpdatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
 
-export const WindHistoryEntrySchema = z.object({
+const WindHistoryEntrySchema = z.object({
   speed: z.number().min(0),
   timestamp: z.string(),
 });
 
-export const WindStatisticsSchema = z.object({
+const WindStatisticsSchema = z.object({
   max: z.number().min(0),
   average: z.number().min(0),
   min: z.number().min(0),
@@ -26,6 +26,24 @@ export const WindDataSchema = z.object({
   history: z.array(WindHistoryEntrySchema),
 });
 
+/** Wind speed sample from a history link on the MEAC page. */
 export type WindHistoryEntry = z.infer<typeof WindHistoryEntrySchema>;
+
+/**
+ * Wind speed statistics for the current reporting period.
+ * Parsed values satisfy `max` >= `average` >= `min`.
+ */
 export type WindStatistics = z.infer<typeof WindStatisticsSchema>;
+
+/**
+ * Validated wind measurement payload from `fetchWindData`.
+ *
+ * - `lastUpdate` — ISO-like local timestamp (`YYYY-MM-DDTHH:MM:SS`); no timezone offset applied
+ * - `location` — place name from the MEAC panel
+ * - `windStrength` — current wind speed (m/s)
+ * - `temperature` — air temperature (°C)
+ * - `windDirection` — direction in degrees, 0–360
+ * - `statistics` — max, average, and min speeds for the period
+ * - `history` — recent samples from alert links on the page
+ */
 export type WindData = z.infer<typeof WindDataSchema>;

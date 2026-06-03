@@ -5,3 +5,8 @@ export type KnownSlug = (typeof KNOWN_SLUGS)[number];
 
 /** MEAC wind page path segment, e.g. `"hummeln"`. */
 export type Slug = string;
+
+/** Returns true when `slug` is one of the documented {@link KNOWN_SLUGS}. */
+export function isKnownSlug(slug: string): slug is KnownSlug {
+  return (KNOWN_SLUGS as readonly string[]).includes(slug);
+}

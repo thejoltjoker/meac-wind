@@ -5,6 +5,8 @@ import {
   WindDataValidationError,
 } from "./index.js";
 import { WindDataSchema } from "./schemas.js";
+import { isValidSlug } from "./slug.js";
+import { isKnownSlug, KNOWN_SLUGS } from "./types.js";
 
 /**
  * Helper to create a mock response with arrayBuffer for encoding tests
@@ -321,6 +323,131 @@ describe("fetchWindData", () => {
     );
   });
 
+  it("should reject invalid slugs before fetching", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+
+    for (const slug of ["", "../evil", "foo/bar", "UPPER", "a b"]) {
+      await expect(fetchWindData(slug)).rejects.toBeInstanceOf(
+        WindDataFetchError
+      );
+      await expect(fetchWindData(slug)).rejects.toThrow("Invalid slug");
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("should pass AbortSignal to fetch when provided", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(sampleHTML));
+    globalThis.fetch = fetchMock;
+
+    await fetchWindData("hummeln", { signal: controller.signal });
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+  });
+
+  it("should pass timeout AbortSignal when timeoutMs is set", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(sampleHTML));
+    globalThis.fetch = fetchMock;
+
+    await fetchWindData("hummeln", { timeoutMs: 5000 });
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeDefined();
+  });
+
+  it("should wrap fetch errors with native Error cause", async () => {
+    const networkError = new Error("Network error");
+    globalThis.fetch = vi.fn().mockRejectedValue(networkError);
+
+    try {
+      await fetchWindData("hummeln");
+    } catch (error) {
+      expect(error).toBeInstanceOf(WindDataFetchError);
+      expect((error as WindDataFetchError).cause).toBe(networkError);
+    }
+  });
+
+  it("should parse statistics by label when table rows are reordered", async () => {
+    const reorderedStatsHtml = sampleHTML.replace(
+      /<tr>\s*<td><span class="meac_label">Max<\/span><\/td>[\s\S]*?<td><span class="meac_data_simple">0.5 m\/s<\/span><\/td>\s*<\/tr>\s*<tr>\s*<td><span class="meac_label">Medel<\/span><\/td>[\s\S]*?<td><span class="meac_data_simple">0.9 m\/s<\/span><\/td>\s*<\/tr>\s*<tr>\s*<td><span class="meac_label">Min<\/span><\/td>[\s\S]*?<td><span class="meac_data_simple">2.4 m\/s<\/span><\/td>\s*<\/tr>/,
+      `<tr>
+                  <td><span class="meac_label">Min</span></td>
+                  <td><span class="meac_data_simple">0.5 m/s</span></td>
+                </tr>
+                <tr>
+                  <td><span class="meac_label">Medel</span></td>
+                  <td><span class="meac_data_simple">0.9 m/s</span></td>
+                </tr>
+                <tr>
+                  <td><span class="meac_label">Max</span></td>
+                  <td><span class="meac_data_simple">2.4 m/s</span></td>
+                </tr>`
+    );
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(reorderedStatsHtml));
+
+    const result = await fetchWindData("hummeln");
+    expect(result.statistics).toMatchObject({
+      max: 2.4,
+      average: 0.9,
+      min: 0.5,
+    });
+  });
+
+  it("should fail when a statistics label is missing", async () => {
+    const htmlWithoutMedel = sampleHTML.replace(
+      '<span class="meac_label">Medel</span>',
+      '<span class="meac_label">Snitt</span>'
+    );
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(htmlWithoutMedel));
+
+    await expect(fetchWindData("hummeln")).rejects.toThrow(
+      "Statistic label not found: Medel"
+    );
+  });
+
+  it("should fail when a statistics row has no wind speed value", async () => {
+    const htmlWithBadMedel = sampleHTML.replace(
+      '<td><span class="meac_data_simple">0.9 m/s</span></td>',
+      '<td><span class="meac_data_simple">n/a</span></td>'
+    );
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(htmlWithBadMedel));
+
+    await expect(fetchWindData("hummeln")).rejects.toThrow(
+      "Statistic value not found for label: Medel"
+    );
+  });
+
+  it("should fail when statistics values violate max >= average >= min", async () => {
+    const htmlWithInvertedMax = sampleHTML.replace(
+      '<td><span class="meac_data_simple">2.4 m/s</span></td>',
+      '<td><span class="meac_data_simple">0.1 m/s</span></td>'
+    );
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(createMockResponse(htmlWithInvertedMax));
+
+    await expect(fetchWindData("hummeln")).rejects.toBeInstanceOf(
+      WindDataFetchError
+    );
+    await expect(fetchWindData("hummeln")).rejects.toThrow(
+      "Invalid statistics ordering"
+    );
+  });
+
   it("should handle history entries with comma decimal separator", async () => {
     const htmlWithCommaHistory = sampleHTML.replace(
       "Vindstyrka: 2.1 m/s",
@@ -440,6 +567,28 @@ describe("fetchWindData", () => {
 
     const result = await fetchWindData("hummeln");
     expect(result.statistics).toMatchObject({ max: 2.4, average: 0.9, min: 0.5 });
+  });
+});
+
+describe("slug and type helpers", () => {
+  it("validates known slugs", () => {
+    for (const slug of KNOWN_SLUGS) {
+      expect(isValidSlug(slug)).toBe(true);
+      expect(isKnownSlug(slug)).toBe(true);
+    }
+  });
+
+  it("rejects invalid slugs via isValidSlug", () => {
+    expect(isValidSlug("")).toBe(false);
+    expect(isValidSlug("../x")).toBe(false);
+    expect(isKnownSlug("unknown-place")).toBe(false);
+  });
+});
+
+describe("resolveFetchSignal", () => {
+  it("should reject non-positive timeoutMs", async () => {
+    const { resolveFetchSignal } = await import("./options.js");
+    expect(() => resolveFetchSignal({ timeoutMs: 0 })).toThrow(RangeError);
   });
 });
 
