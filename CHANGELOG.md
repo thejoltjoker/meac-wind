@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/thejoltjoker/meac-wind/compare/v0.2.0...v0.3.0) (2026-06-03)
+
+
+### Features
+
+* review code quality and do refactoring ([#4](https://github.com/thejoltjoker/meac-wind/issues/4)) ([a86964f](https://github.com/thejoltjoker/meac-wind/commit/a86964f9825ce9901901c6de6de330a3b4d0ffd9))
+
 ## [0.2.0](https://github.com/thejoltjoker/meac-wind/compare/v0.1.0...v0.2.0) (2026-06-03)
 
 
