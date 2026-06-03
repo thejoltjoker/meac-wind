@@ -3,7 +3,8 @@ import {
   fetchWindData,
   WindDataFetchError,
   WindDataValidationError,
-} from "./index";
+} from "./index.js";
+import { WindDataSchema } from "./schemas.js";
 
 /**
  * Helper to create a mock response with arrayBuffer for encoding tests
@@ -442,6 +443,30 @@ describe("fetchWindData", () => {
   });
 });
 
+describe("WindDataSchema", () => {
+  const validPayload = {
+    lastUpdate: "2026-01-24T21:43:00",
+    location: "Hummeln Åre",
+    windStrength: 1.9,
+    temperature: -14.4,
+    windDirection: 30,
+    statistics: { max: 2.4, average: 0.9, min: 0.5 },
+    history: [{ speed: 2.1, timestamp: "2026-01-24 20:10" }],
+  };
+
+  it("accepts a valid payload", () => {
+    expect(WindDataSchema.safeParse(validPayload).success).toBe(true);
+  });
+
+  it("rejects lastUpdate strings outside YYYY-MM-DDTHH:MM:SS", () => {
+    const result = WindDataSchema.safeParse({
+      ...validPayload,
+      lastUpdate: "2026-01-24 21:43",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("fetchWindData validation fallback branches", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -449,8 +474,8 @@ describe("fetchWindData validation fallback branches", () => {
   });
 
   it("should throw WindDataValidationError even if schema error has no issues array", async () => {
-    vi.doMock("./schemas", async (importOriginal) => {
-      const original = await importOriginal<typeof import("./schemas")>();
+    vi.doMock("./schemas.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("./schemas.js")>();
       return {
         ...original,
         WindDataSchema: {
@@ -460,7 +485,7 @@ describe("fetchWindData validation fallback branches", () => {
     });
 
     const { fetchWindData: fetchWindDataMocked, WindDataValidationError: WindDataValidationErrorMocked } =
-      await import("./index");
+      await import("./index.js");
 
     globalThis.fetch = vi
       .fn()
@@ -475,8 +500,8 @@ describe("fetchWindData validation fallback branches", () => {
   });
 
   it('should label validation issues with empty path as "root"', async () => {
-    vi.doMock("./schemas", async (importOriginal) => {
-      const original = await importOriginal<typeof import("./schemas")>();
+    vi.doMock("./schemas.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("./schemas.js")>();
       return {
         ...original,
         WindDataSchema: {

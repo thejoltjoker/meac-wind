@@ -17,7 +17,7 @@ This is an **unofficial** package — not affiliated with or endorsed by MEAC. I
 - Low-frequency access — occasional fetches with caching
 - Attribution — credit MEAC when displaying data
 
-### Required practices
+### Best practices
 
 1. **Rate limiting** — cache responses (at least 1 minute between requests); use exponential backoff on retries
 2. **Identification** — use a transparent user-agent that identifies your app (see [Best practices](#best-practices-for-production-use))
@@ -47,11 +47,13 @@ If you represent MEAC and have concerns about this package, open an issue on the
   - Current wind strength
   - Temperature
   - Wind direction
-  - Statistics (`max`, `average`, `min`)
+  - Statistics (`max`, `average`, `min`) — parsed in DOM order (Max → Medel → Min)
   - Wind history from `javascript: alert(...)` links
 - Validates the final payload with Zod.
 
 ## Installation
+
+This package is **ESM-only** (`"type": "module"`). Use `import` in Node 18+ or a bundler that supports ESM.
 
 ```bash
 npm install meac-wind
@@ -69,7 +71,13 @@ const data = await fetchWindData("hummeln");
 console.log(data);
 ```
 
-Available location slugs include:
+Documented location slugs (see `KNOWN_SLUGS`); any MEAC path slug string is accepted:
+
+```ts
+import { fetchWindData, KNOWN_SLUGS } from "meac-wind";
+
+console.log(KNOWN_SLUGS); // ["hummeln", "sundsvallshamn", "helags"]
+```
 
 ```ts
 import { fetchWindData } from "meac-wind";
@@ -91,6 +99,9 @@ The package includes TypeScript definitions. Import types as needed:
 ```ts
 import {
   fetchWindData,
+  KNOWN_SLUGS,
+  WindDataFetchError,
+  WindDataValidationError,
   type WindData,
   type WindStatistics,
   type Slug,
@@ -126,9 +137,12 @@ type WindData = {
 
 Validation is implemented in `src/schemas.ts`:
 
+- `lastUpdate` must match `YYYY-MM-DDTHH:MM:SS` (parser output format).
 - `windStrength`, statistics values, and history `speed` are non-negative.
 - `windDirection` must be between `0` and `360`.
 - `history` is an array of `{ speed, timestamp }`.
+
+Statistics are read from `.meac_data_simple` elements in page order. If MEAC reorders labels or markup, `max` / `average` / `min` may be wrong until the parser is updated.
 
 ## Best practices for production use
 
@@ -155,13 +169,24 @@ async function getCachedWindData(slug: string) {
 
 ### 2. Handle Errors Gracefully
 
+`fetchWindData` throws `WindDataFetchError` (network, HTTP, or parse failures) or `WindDataValidationError` (schema mismatch). Both extend `Error`.
+
 ```typescript
+import {
+  fetchWindData,
+  WindDataFetchError,
+  WindDataValidationError,
+} from "meac-wind";
+
 try {
   const data = await fetchWindData("hummeln");
   console.log(data);
 } catch (error) {
-  console.error("Failed to fetch wind data:", error);
-  // Use cached/fallback data or show user-friendly error
+  if (error instanceof WindDataValidationError) {
+    console.error("Invalid parsed data:", error.details);
+  } else if (error instanceof WindDataFetchError) {
+    console.error("Fetch or parse failed:", error.message, error.cause);
+  }
 }
 ```
 
@@ -172,6 +197,35 @@ The package sends a transparent user-agent (`meac-wind-scraper/...`). Forks and 
 ```typescript
 "user-agent": "my-wind-dashboard/1.0 (+https://github.com/you/my-app)"
 ```
+
+## Releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please) on `main`. Typical flow:
+
+1. Work on a feature branch or `dev`; open PRs into `dev` (or directly to `main` if you prefer).
+2. Squash-merge into `dev`, then squash-merge `dev` → `main` when ready.
+3. On `main`, release-please opens or updates a **Release PR** (version bump + `CHANGELOG.md`).
+4. Merge that Release PR on `main` to create the GitHub release and publish to npm.
+
+### Commit messages
+
+release-please reads [Conventional Commits](https://www.conventionalcommits.org/) on `main`. For squash merges, set the **squash commit title** to a conventional message (often the PR title), e.g. `feat: add Sundsvall slug` or `fix: handle empty wind history`.
+
+### npm trusted publishing (one-time setup)
+
+Publishing uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC) — no `NPM_TOKEN` in GitHub secrets.
+
+On [npmjs.com](https://www.npmjs.com/) → package **meac-wind** → **Settings** → **Trusted Publisher** → **GitHub Actions**, set:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `thejoltjoker` |
+| Repository | `meac-wind` |
+| Workflow filename | `release-please.yml` |
+
+Enable **Require two-factor authentication** and **Disallow tokens** on the package if you want publish-only-via-OIDC.
+
+In the repo, enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** so release-please can open Release PRs.
 
 ## Development
 
@@ -199,33 +253,24 @@ Current source files:
 - `src/types.ts` - TypeScript type definitions.
 - `src/index.test.ts` - Vitest tests with mocked fetch responses.
 
-The test suite expects a Vitest setup and checks:
+The test suite uses Vitest with mocked `fetch` responses and checks:
 
 - successful parsing for normal and Swedish numeric formats
-- handling of malformed/missing data
-- validation failures for invalid ranges
-- default and custom URL behavior
+- slug-based URL construction
+- handling of malformed or missing HTML
+- validation failures for invalid ranges and `lastUpdate` format
+- custom error types and edge cases in the validation error path
 
-## Publishing
+## License & disclaimer
 
-Releases are automated with GitHub Actions + release-please.
+**Code:** [MIT](LICENSE.md) — applies to this repository's source and documentation only, not to wind data fetched from MEAC or other third parties.
 
-### One-time setup
+**Disclaimer:** This package is an unofficial community tool, not a meteorological service. MEAC names and data remain the property of their respective owners; references are for identification and attribution only.
 
-1. Add an npm automation token as a GitHub Actions secret named `NPM_TOKEN`.
-2. Ensure your default branch is `main`.
-3. Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, etc.) for merge commits so release-please can infer version bumps.
+Use at your own risk. The software and any parsed data are provided **"as is"** without warranty of accuracy, completeness, timeliness, or continued availability. The parser may break if MEAC changes their site, and access may be restricted at any time.
 
-### Release flow
+**Do not rely on this for safety-critical decisions** (aviation, maritime, mountaineering, emergency response, construction, or similar). For authoritative or licensed data, contact [MEAC](https://meac.se) directly.
 
-1. Push/merge changes to `main`.
-2. `Release Please` opens or updates a release PR with version/changelog updates.
-3. Merge the release PR when ready.
-4. release-please creates a GitHub release and tag.
-5. `Publish to npm` workflow publishes the tagged release to npm automatically.
+You are responsible for how you use this package - including compliance with applicable laws, website terms, rate limits, and intellectual-property rights. The maintainer does not encourage excessive automated access, circumvention of blocks, or redistribution of third-party data against applicable policies.
 
-The CI workflow (`CI`) runs build + tests on push and pull requests.
-
-## License
-
-MIT — see [LICENSE.md](LICENSE.md).
+There is no guarantee of maintenance or support. To the extent permitted by law, liability is limited as described in [LICENSE.md](LICENSE.md). If you represent a rights holder with concerns, open a [GitHub issue](https://github.com/thejoltjoker/meac-wind/issues) and good-faith requests will be honored promptly.

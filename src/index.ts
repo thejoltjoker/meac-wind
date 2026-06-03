@@ -1,11 +1,13 @@
-import type { WindData } from "./schemas";
+import type { WindData } from "./schemas.js";
 import { parseHTML } from "linkedom";
-import { WindDataSchema } from "./schemas";
-import { Slug } from "./types";
+import { WindDataSchema } from "./schemas.js";
+import type { Slug } from "./types.js";
+import { packageVersion } from "./version.js";
 
 // Re-export types for consumers
-export type { WindData, WindStatistics, WindHistoryEntry } from "./schemas";
-export type { Slug } from "./types";
+export type { WindData, WindStatistics, WindHistoryEntry } from "./schemas.js";
+export type { Slug, KnownSlug } from "./types.js";
+export { KNOWN_SLUGS } from "./types.js";
 
 export class WindDataValidationError extends Error {
   readonly details?: string[];
@@ -97,7 +99,7 @@ function extractStatistics(document: Document): {
     }
   });
 
-  // The order should be Max, Medel (Average), Min
+  // Assumes DOM order is Max, Medel (average), Min — see README if MEAC changes layout
   if (values.length < 3) {
     throw new Error(
       `Expected 3 statistics values, found ${values.length}: ${values.join(
@@ -173,7 +175,8 @@ function parseDateString(dateStr: string): string {
  * 
  * @param slug The location slug (e.g., "hummeln", "sundsvallshamn")
  * @returns Validated wind data object
- * @throws Error if fetching, parsing, or validation fails
+ * @throws {WindDataFetchError} if the HTTP request or HTML parsing fails
+ * @throws {WindDataValidationError} if the parsed data fails schema validation
  */
 export async function fetchWindData(slug: Slug): Promise<WindData> {
   const url = `https://meac.se/sub_2/${slug}/wind.asp`;
@@ -183,7 +186,7 @@ export async function fetchWindData(slug: Slug): Promise<WindData> {
     const response = await fetch(url, {
       headers: {
         // Identify as meac-wind scraper (be transparent about automated access)
-        "user-agent": "meac-wind-scraper/0.1.0 (+https://github.com/thejoltjoker/meac-wind)",
+        "user-agent": `meac-wind-scraper/${packageVersion} (+https://github.com/thejoltjoker/meac-wind)`,
         accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "en-US,en;q=0.9",
         "cache-control": "no-cache",
