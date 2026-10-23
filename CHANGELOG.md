@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/thejoltjoker/meac-wind/compare/v0.3.0...v0.3.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* read packageVersion via JSON import for Workers ([#6](https://github.com/thejoltjoker/meac-wind/issues/6)) ([f8970af](https://github.com/thejoltjoker/meac-wind/commit/f8970af8085e36d6efd105dd37a79d8438ed3460))
+
 ## [0.3.0](https://github.com/thejoltjoker/meac-wind/compare/v0.2.0...v0.3.0) (2026-06-03)
 
 
