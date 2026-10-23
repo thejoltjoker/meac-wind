@@ -1,5 +1,3 @@
-import { createRequire } from "node:module";
+import packageJson from "../package.json" with { type: "json" };
 
-const require = createRequire(import.meta.url);
-
-export const packageVersion: string = require("../package.json").version;
+export const packageVersion: string = packageJson.version;

@@ -53,7 +53,7 @@ If you represent MEAC and have concerns about this package, open an issue on the
 
 ## Installation
 
-This package is **ESM-only** (`"type": "module"`). Use `import` in Node 18+ or a bundler that supports ESM.
+This package is **ESM-only** (`"type": "module"`). Use `import` in Node 18+ or a bundler that supports ESM. It also runs on Cloudflare Workers (and other `fetch` + bundler runtimes): `packageVersion` is read via a JSON module import so the entry does not call Node-only `createRequire`.
 
 ```bash
 npm install meac-wind

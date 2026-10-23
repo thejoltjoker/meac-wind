@@ -4,9 +4,11 @@ import {
   WindDataFetchError,
   WindDataValidationError,
 } from "./index.js";
+import packageJson from "../package.json" with { type: "json" };
 import { WindDataSchema } from "./schemas.js";
 import { isValidSlug } from "./slug.js";
 import { isKnownSlug, KNOWN_SLUGS } from "./types.js";
+import { packageVersion } from "./version.js";
 
 /**
  * Helper to create a mock response with arrayBuffer for encoding tests
@@ -131,6 +133,12 @@ const sampleHTML = `
 </body>
 </html>
 `;
+
+describe("packageVersion", () => {
+  it("matches package.json without Node createRequire", () => {
+    expect(packageVersion).toBe(packageJson.version);
+  });
+});
 
 describe("fetchWindData", () => {
   beforeEach(() => {
@@ -321,6 +329,9 @@ describe("fetchWindData", () => {
     expect(fetchMock.mock.calls[0][0]).toBe(
       `https://meac.se/sub_2/${customSlug}/wind.asp`
     );
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      "user-agent": `meac-wind/${packageVersion}`,
+    });
   });
 
   it("should reject invalid slugs before fetching", async () => {
